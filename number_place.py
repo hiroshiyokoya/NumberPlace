@@ -109,7 +109,7 @@ class Board():
         self.update_board()
 
     def update_board(self):
-        self.__cell_df.val = self.__solver.get_values()
+        self.__cell_df.val = self.__solver.get_current_cell_values()
 
 
 class Solver():
@@ -131,7 +131,7 @@ class Solver():
     def count_unfilled(self):
         return sum([ cell.val==0 for cell in self.__cells ])
 
-    def get_values(self):
+    def get_current_cell_values(self):
         return [ cell.val for cell in self.__cells ]
   
     def check_uniques(self):
@@ -140,19 +140,19 @@ class Solver():
     def check_all_cols(self):
         for col in range(1,10):
             selected_cells = [ cell for cell in self.__cells if cell.col==col ]
-            self.check_nine(selected_cells)
+            self.__check_nine(selected_cells)
             
     def check_all_rows(self):
         for row in range(1,10):
             selected_cells = [ cell for cell in self.__cells if cell.row==row ]
-            self.check_nine(selected_cells)
+            self.__check_nine(selected_cells)
     
     def check_all_blocks(self):
         for block in range(1,10):
             selected_cells = [ cell for cell in self.__cells if cell.block==block ]
-            self.check_nine(selected_cells)
+            self.__check_nine(selected_cells)
 
-    def check_nine(self,selected_cells):
+    def __check_nine(self,selected_cells):
         update_candidates_in_nine(selected_cells)        
         unique_candidates = find_unique_candidates(selected_cells)
         self.fill_uniques(unique_candidates)
@@ -189,6 +189,7 @@ def update_candidates_in_nine(cells):
             [ cell.remove_from_candidates(f) for f in filled ]
 
 def find_unique_candidates(cells):
+    assert len(cells)==9
     unique_candidates = []
     for cell in cells:
         candidates = cell.candidates
@@ -202,16 +203,18 @@ def find_unique_candidates(cells):
     return unique_candidates
 
 def find_pairing_candidates(cells):
+    assert len(cells)==9
     unique_pairings = []
     for cell in cells:
         candidates = cell.candidates
-        if len(candidates)==2:
+        if len(candidates)>1:
             same_others = [ other.id for other in cells if other.id!=cell.id and candidates==other.candidates ]
-            if len(same_others)>0:
+            if len(same_others)==len(candidates)-1:
                 unique_pairings.append({'indices':set([cell.id]+same_others), 'candidates':candidates})
     return unique_pairings
 
 def exclusive_pairings(cells,pairing_list):
+    assert len(cells)==9
     for pairing in pairing_list:
         for cell in cells:
             if cell.id not in list(pairing['indices']):
