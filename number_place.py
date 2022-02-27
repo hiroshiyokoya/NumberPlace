@@ -153,14 +153,18 @@ class Solver():
             self.check_nine(selected_cells)
 
     def check_nine(self,selected_cells):
-        update_cells(selected_cells)        
+        update_candidates_in_nine(selected_cells)        
         unique_candidates = find_unique_candidates(selected_cells)
-        fill_uniques(self.__cells, unique_candidates)
-        update_cells(selected_cells)
+        self.fill_uniques(unique_candidates)
+        update_candidates_in_nine(selected_cells)
         pairing_list = find_pairing_candidates(selected_cells)
         exclusive_pairings(selected_cells, pairing_list)
-        update_cells(selected_cells)
-    
+        update_candidates_in_nine(selected_cells)
+
+    def fill_uniques(self,fill_list):
+        for fill in fill_list:
+            self.__cells[fill['index']].val = fill['unique']
+
     def step(self):
         self.check_all_rows()
         self.check_all_cols()
@@ -177,7 +181,8 @@ class Solver():
         print(f'steps to solve: {step}')
 
 
-def update_cells(cells):
+def update_candidates_in_nine(cells):
+    assert len(cells)==9
     filled = set( cell.val for cell in cells if cell.val!=0 )
     for cell in cells:
         if cell.val==0:
@@ -195,10 +200,6 @@ def find_unique_candidates(cells):
             print('Error!!')
             return []
     return unique_candidates
-
-def fill_uniques(cells,fill_list):
-    for fill in fill_list:
-        cells[fill['index']].val = fill['unique']
 
 def find_pairing_candidates(cells):
     unique_pairings = []
