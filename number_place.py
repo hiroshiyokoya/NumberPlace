@@ -6,12 +6,13 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 class Cell():
-    def __init__(self, row, col, val=0):
+    def __init__(self, row, col, id, val=0):
         self.row = row
         self.col = col
+        self.id = id
         self.block = (row-1)//3*3 + (col-1)//3 + 1
         self.__val = val
-        if self.__val == 0:
+        if self.__val==0:
             self.__candidates = set(range(1,10))
         else:
             self.__candidates = set()
@@ -40,87 +41,29 @@ class Cell():
            
 class Board():
     def __init__(self, board_init=[]):
+        self.__solver = Solver()
         self.reset(board_init)
     
     def reset(self, board_init=None):
         if board_init is not None:
             self.__board_init = board_init
 
-        self.__cell_df = pd.DataFrame(columns=['row','col','block','cell'])
+        self.__cell_df = pd.DataFrame(columns=['row','col','block','val'])
         k = 0
         for i in range(1,10):
             for j in range(1,10):
-                self.__cell_df.loc[k,:] = [i,j,(i-1)//3*3+(j-1)//3+1,Cell(i,j,0)]
+                self.__cell_df.loc[k,:] = [i,j,(i-1)//3*3+(j-1)//3+1,0]
                 k+=1
 
         for elem in self.__board_init:
             k = (elem['row']-1)*9 + elem['col']-1
-            self.__cell_df.loc[k,'cell'].val = elem['val']
-        
+            self.__cell_df.loc[k,'val'] = elem['val']
+
+        self.__solver.reset(self.__board_init)
+    
     def count_unfilled(self):
-        return sum([ cell.val==0 for cell in self.__cell_df['cell'] ])
+        return sum([ val==0 for val in self.__cell_df.val ])
         
-    def list_candidates(self):
-        return [ cell.candidates if len(cell.candidates)>0 else 0 for cell in self.__cell_df['cell'] ]
-    
-    def check_uniques(self):
-        [ cell.fill_unique() for cell in self.__cell_df['cell'] ]
-
-    def check_all_cols(self):
-        for col in range(1,10):
-            self.check_col(col)
-            
-    def check_col(self,col):
-        update_cells(self.__cell_df[self.__cell_df.col==col])
-        unique_candidates = find_unique_candidates(self.__cell_df[self.__cell_df.col==col])
-        fill_uniques(self.__cell_df, unique_candidates)
-        update_cells(self.__cell_df[self.__cell_df.col==col])
-
-        pairing_list = find_pairing_candidates(self.__cell_df[self.__cell_df.col==col])
-        exclusive_pairings(self.__cell_df[self.__cell_df.col==col], pairing_list)
-
-    def check_all_rows(self):
-        for row in range(1,10):
-            self.check_row(row)
-    
-    def check_row(self,row):
-        update_cells(self.__cell_df[self.__cell_df.row==row])
-        unique_candidates = find_unique_candidates(self.__cell_df[self.__cell_df.row==row])
-        fill_uniques(self.__cell_df, unique_candidates)
-        update_cells(self.__cell_df[self.__cell_df.row==row])
-
-        pairing_list = find_pairing_candidates(self.__cell_df[self.__cell_df.row==row])
-        exclusive_pairings(self.__cell_df[self.__cell_df.row==row], pairing_list)
-    
-    def check_all_blocks(self):
-        for block in range(1,10):
-            self.check_block(block)
-    
-    def check_block(self,block):
-        update_cells(self.__cell_df[self.__cell_df.block==block])        
-        unique_candidates = find_unique_candidates(self.__cell_df[self.__cell_df.block==block])
-        fill_uniques(self.__cell_df, unique_candidates)
-        update_cells(self.__cell_df[self.__cell_df.block==block])
-    
-        pairing_list = find_pairing_candidates(self.__cell_df[self.__cell_df.block==block])
-        exclusive_pairings(self.__cell_df[self.__cell_df.block==block], pairing_list)
-
-    def step(self):
-        self.check_all_rows()
-        self.check_all_cols()
-        self.check_all_blocks()
-        self.check_uniques()
-        
-    def solve(self,):
-        t0 = time.time()
-        step = 0
-        while self.count_unfilled()>0:
-            self.step()
-            step+=1
-        print(f'time to solve: {time.time()-t0:.2f} [s]')
-        print(f'steps to solve: {step}')
-        self.draw()
-
     def draw(self,init=False):
         if init:
             board_arr = np.zeros((9,9), dtype=int)
@@ -131,10 +74,7 @@ class Board():
                 board_arr[row-1,col-1] = val
         else:
             board_arr = np.zeros((9,9), dtype=int)
-            for cell in self.__cell_df.loc[:,'cell']:
-                row = cell.row
-                col = cell.col
-                val = cell.val
+            for row, col, val in zip(self.__cell_df.row,self.__cell_df.col,self.__cell_df.val):
                 board_arr[row-1,col-1] = val
 
         plt.figure(figsize=(6,6))
@@ -156,43 +96,123 @@ class Board():
     def draw_init(self):
         self.draw(init=True)
 
+    def list_candidates(self):
+        return [ cell.candidates if len(cell.candidates)>0 else 0 for cell in self.__cells ]
 
-def update_cells(df):
-    filled = set( cell.val for cell in df.cell if cell.val!=0 )
-    for cell in df.cell:
+    def solve(self):
+        self.__solver.solve()
+        self.update_board()
+        self.draw()
+
+    def step_solve(self):
+        self.__solver.step()
+        self.update_board()
+
+    def update_board(self):
+        self.__cell_df.val = self.__solver.get_values()
+
+
+class Solver():
+    def __init__(self, board_init=[]):
+        self.reset(board_init)
+
+    def reset(self, board_init):
+        self.__cells = []
+        k = 0
+        for i in range(1,10):
+            for j in range(1,10):
+                self.__cells.append(Cell(i,j,k,0))
+                k+=1
+
+        for elem in board_init:
+            k = (elem['row']-1)*9 + elem['col']-1
+            self.__cells[k].val = elem['val']
+
+    def count_unfilled(self):
+        return sum([ cell.val==0 for cell in self.__cells ])
+
+    def get_values(self):
+        return [ cell.val for cell in self.__cells ]
+  
+    def check_uniques(self):
+        [ cell.fill_unique() for cell in self.__cells ]
+
+    def check_all_cols(self):
+        for col in range(1,10):
+            selected_cells = [ cell for cell in self.__cells if cell.col==col ]
+            self.check_nine(selected_cells)
+            
+    def check_all_rows(self):
+        for row in range(1,10):
+            selected_cells = [ cell for cell in self.__cells if cell.row==row ]
+            self.check_nine(selected_cells)
+    
+    def check_all_blocks(self):
+        for block in range(1,10):
+            selected_cells = [ cell for cell in self.__cells if cell.block==block ]
+            self.check_nine(selected_cells)
+
+    def check_nine(self,selected_cells):
+        update_cells(selected_cells)        
+        unique_candidates = find_unique_candidates(selected_cells)
+        fill_uniques(self.__cells, unique_candidates)
+        update_cells(selected_cells)
+        pairing_list = find_pairing_candidates(selected_cells)
+        exclusive_pairings(selected_cells, pairing_list)
+        update_cells(selected_cells)
+    
+    def step(self):
+        self.check_all_rows()
+        self.check_all_cols()
+        self.check_all_blocks()
+        self.check_uniques()
+        
+    def solve(self,):
+        t0 = time.time()
+        step = 0
+        while self.count_unfilled()>0:
+            self.step()
+            step+=1
+        print(f'time to solve: {time.time()-t0:.2f} [s]')
+        print(f'steps to solve: {step}')
+
+
+def update_cells(cells):
+    filled = set( cell.val for cell in cells if cell.val!=0 )
+    for cell in cells:
         if cell.val==0:
             [ cell.remove_from_candidates(f) for f in filled ]
 
-def find_unique_candidates(df):
+def find_unique_candidates(cells):
     unique_candidates = []
-    for i, row in df.iterrows():
-        candidates = row.cell.candidates
-        union_other_candidates = set(sum([ list(other.candidates) for j,other in zip(df.index,df.cell) if j!=row.name ],[]))
+    for cell in cells:
+        candidates = cell.candidates
+        union_other_candidates = set(sum([ list(other.candidates) for other in cells if other.id!=cell.id ],[]))
         unique_candidate = [ candidate for candidate in candidates if candidate not in union_other_candidates ]
         if len(unique_candidate)==1:
-            unique_candidates.append({'index':row.name, 'unique':unique_candidate[0]})
+            unique_candidates.append({'index':cell.id, 'unique':unique_candidate[0]})
         elif len(unique_candidate)>1:
             print('Error!!')
             return []
     return unique_candidates
 
-def fill_uniques(df,fill_list):
+def fill_uniques(cells,fill_list):
     for fill in fill_list:
-        df.loc[fill['index'],'cell'].val = fill['unique']
+        cells[fill['index']].val = fill['unique']
 
-def find_pairing_candidates(df):
+def find_pairing_candidates(cells):
     unique_pairings = []
-    for i,cell in zip(df.index, df.cell):
+    for cell in cells:
         candidates = cell.candidates
         if len(candidates)==2:
-            same_others = [ j for j,other in zip(df.index,df.cell) if j!=i and candidates==other.candidates ]
+            same_others = [ other.id for other in cells if other.id!=cell.id and candidates==other.candidates ]
             if len(same_others)>0:
-                unique_pairings.append({'indices':set([i]+same_others), 'candidates':candidates})
+                unique_pairings.append({'indices':set([cell.id]+same_others), 'candidates':candidates})
     return unique_pairings
 
-def exclusive_pairings(df,pairing_list):
+def exclusive_pairings(cells,pairing_list):
     for pairing in pairing_list:
-        for i in df.index:
-            if i not in list(pairing['indices']):
+        for cell in cells:
+            if cell.id not in list(pairing['indices']):
                 for val in pairing['candidates']:
-                    df.loc[i,'cell'].remove_from_candidates(val)
+                    cell.remove_from_candidates(val)
