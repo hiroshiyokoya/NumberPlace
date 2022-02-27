@@ -12,9 +12,9 @@ class Cell():
         self.block = (row-1)//3*3 + (col-1)//3 + 1
         self.__val = val
         if self.__val == 0:
-            self.__possibles = set(range(1,10))
+            self.__candidates = set(range(1,10))
         else:
-            self.__possibles = set()
+            self.__candidates = set()
     
     @property
     def val(self):
@@ -23,61 +23,21 @@ class Cell():
     @val.setter
     def val(self, value):
         self.__val = value
-        self.__possibles = set()
+        self.__candidates = set()
 
     @property
-    def possibles(self):
-        return self.__possibles
+    def candidates(self):
+        return self.__candidates
     
-    def remove_from_possibles(self,val):
-        if val in self.__possibles:
-            self.__possibles.remove(val)
+    def remove_from_candidates(self,val):
+        if val in self.__candidates:
+            self.__candidates.remove(val)
         
-    def check_unique(self,):
-        if self.val==0 and len(self.possibles)==1:
-            self.val = list(self.possibles)[0]
+    def fill_unique(self,):
+        if self.val==0 and len(self.candidates)==1:
+            self.val = list(self.candidates)[0]
 
-def update_states(df):
-    filled = set( cell.val for cell in df.cell if cell.val!=0 )
-    for cell in df.cell:
-        if cell.val==0:
-            [ cell.remove_from_possibles(f) for f in filled ]
-
-def find_unique_possibles(df):
-    unique_possibles = []
-    for i,row in df.iterrows():
-        possibles = row.cell.possibles
-        union_other_possibles = set(sum([ list(other.possibles) for j,other in zip(df.index,df.cell) if j!=row.name ],[]))
-        unique_possible = [ possible for possible in possibles if possible not in union_other_possibles ]
-        if len(unique_possible)==1:
-            unique_possibles.append({'index':row.name, 'unique':unique_possible[0]})
-        elif len(unique_possible)>1:
-            print('Error!!')
-            return []
-    return unique_possibles
-
-def fill_uniques(df,fill_list):
-    for fill in fill_list:
-        df.loc[fill['index'],'cell'].val = fill['unique']
-
-def find_pairing_possibles(df):
-    unique_pairings = []
-    for i,row in df.iterrows():
-        possibles = row.cell.possibles
-        if len(possibles)==2:
-            same_others = [ j for j,other in zip(df.index,df.cell) if j!=row.name and possibles==other.possibles ]
-            if len(same_others)>0:
-                unique_pairings.append((set([row.name]+same_others), possibles))
-    return unique_pairings
-
-def exclusive_pairings(df,pairing_list):
-    for pairing in pairing_list:
-        for i in df.index:
-            if i not in list(pairing[0]):
-                for val in pairing[1]:
-                    df.loc[i,'cell'].remove_from_possibles(val)
-
-
+           
 class Board():
     def __init__(self, board_init=[]):
         self.reset(board_init)
@@ -98,25 +58,25 @@ class Board():
             self.__cell_df.loc[k,'cell'].val = elem['val']
         
     def count_unfilled(self):
-        return sum([ cell.val==0 for cell in self.__cell_df['cell']  ])
+        return sum([ cell.val==0 for cell in self.__cell_df['cell'] ])
         
-    def list_possibles(self):
-        return [ cell.possibles if len(cell.possibles)>0 else 0 for cell in self.__cell_df['cell'] ]
+    def list_candidates(self):
+        return [ cell.candidates if len(cell.candidates)>0 else 0 for cell in self.__cell_df['cell'] ]
     
     def check_uniques(self):
-        [ cell.check_unique() for cell in self.__cell_df['cell'] ]
+        [ cell.fill_unique() for cell in self.__cell_df['cell'] ]
 
     def check_all_cols(self):
         for col in range(1,10):
             self.check_col(col)
             
     def check_col(self,col):
-        update_states(self.__cell_df[self.__cell_df.col==col])
-        unique_possibles = find_unique_possibles(self.__cell_df[self.__cell_df.col==col])
-        fill_uniques(self.__cell_df, unique_possibles)
-        update_states(self.__cell_df[self.__cell_df.col==col])
+        update_cells(self.__cell_df[self.__cell_df.col==col])
+        unique_candidates = find_unique_candidates(self.__cell_df[self.__cell_df.col==col])
+        fill_uniques(self.__cell_df, unique_candidates)
+        update_cells(self.__cell_df[self.__cell_df.col==col])
 
-        pairing_list = find_pairing_possibles(self.__cell_df[self.__cell_df.col==col])
+        pairing_list = find_pairing_candidates(self.__cell_df[self.__cell_df.col==col])
         exclusive_pairings(self.__cell_df[self.__cell_df.col==col], pairing_list)
 
     def check_all_rows(self):
@@ -124,12 +84,12 @@ class Board():
             self.check_row(row)
     
     def check_row(self,row):
-        update_states(self.__cell_df[self.__cell_df.row==row])
-        unique_possibles = find_unique_possibles(self.__cell_df[self.__cell_df.row==row])
-        fill_uniques(self.__cell_df, unique_possibles)
-        update_states(self.__cell_df[self.__cell_df.row==row])
+        update_cells(self.__cell_df[self.__cell_df.row==row])
+        unique_candidates = find_unique_candidates(self.__cell_df[self.__cell_df.row==row])
+        fill_uniques(self.__cell_df, unique_candidates)
+        update_cells(self.__cell_df[self.__cell_df.row==row])
 
-        pairing_list = find_pairing_possibles(self.__cell_df[self.__cell_df.row==row])
+        pairing_list = find_pairing_candidates(self.__cell_df[self.__cell_df.row==row])
         exclusive_pairings(self.__cell_df[self.__cell_df.row==row], pairing_list)
     
     def check_all_blocks(self):
@@ -137,12 +97,12 @@ class Board():
             self.check_block(block)
     
     def check_block(self,block):
-        update_states(self.__cell_df[self.__cell_df.block==block])        
-        unique_possibles = find_unique_possibles(self.__cell_df[self.__cell_df.block==block])
-        fill_uniques(self.__cell_df, unique_possibles)
-        update_states(self.__cell_df[self.__cell_df.block==block])
+        update_cells(self.__cell_df[self.__cell_df.block==block])        
+        unique_candidates = find_unique_candidates(self.__cell_df[self.__cell_df.block==block])
+        fill_uniques(self.__cell_df, unique_candidates)
+        update_cells(self.__cell_df[self.__cell_df.block==block])
     
-        pairing_list = find_pairing_possibles(self.__cell_df[self.__cell_df.block==block])
+        pairing_list = find_pairing_candidates(self.__cell_df[self.__cell_df.block==block])
         exclusive_pairings(self.__cell_df[self.__cell_df.block==block], pairing_list)
 
     def step(self):
@@ -196,3 +156,43 @@ class Board():
     def draw_init(self):
         self.draw(init=True)
 
+
+def update_cells(df):
+    filled = set( cell.val for cell in df.cell if cell.val!=0 )
+    for cell in df.cell:
+        if cell.val==0:
+            [ cell.remove_from_candidates(f) for f in filled ]
+
+def find_unique_candidates(df):
+    unique_candidates = []
+    for i, row in df.iterrows():
+        candidates = row.cell.candidates
+        union_other_candidates = set(sum([ list(other.candidates) for j,other in zip(df.index,df.cell) if j!=row.name ],[]))
+        unique_candidate = [ candidate for candidate in candidates if candidate not in union_other_candidates ]
+        if len(unique_candidate)==1:
+            unique_candidates.append({'index':row.name, 'unique':unique_candidate[0]})
+        elif len(unique_candidate)>1:
+            print('Error!!')
+            return []
+    return unique_candidates
+
+def fill_uniques(df,fill_list):
+    for fill in fill_list:
+        df.loc[fill['index'],'cell'].val = fill['unique']
+
+def find_pairing_candidates(df):
+    unique_pairings = []
+    for i,cell in zip(df.index, df.cell):
+        candidates = cell.candidates
+        if len(candidates)==2:
+            same_others = [ j for j,other in zip(df.index,df.cell) if j!=i and candidates==other.candidates ]
+            if len(same_others)>0:
+                unique_pairings.append({'indices':set([i]+same_others), 'candidates':candidates})
+    return unique_pairings
+
+def exclusive_pairings(df,pairing_list):
+    for pairing in pairing_list:
+        for i in df.index:
+            if i not in list(pairing['indices']):
+                for val in pairing['candidates']:
+                    df.loc[i,'cell'].remove_from_candidates(val)
