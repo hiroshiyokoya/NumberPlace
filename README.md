@@ -3,6 +3,7 @@ Develop NumberPlace application
 
 
 ## Classes
+
 ### Cell
 describe cell status
 
@@ -23,8 +24,8 @@ describe board status
 
 #### Variables
 - __board_init
-- __solver
 - __cell_df
+- __solver
 
 #### Methods
 - reset
@@ -41,6 +42,7 @@ solve the board
 
 #### Variables
 - __cells
+
 #### Methods
 - reset
 - count_unfilled
