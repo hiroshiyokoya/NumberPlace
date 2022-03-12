@@ -11,9 +11,9 @@ def get_corners(pix_arr):
     corners = np.array([ pix_arr[get_argmax_directs(pix_arr,i)] for i in range(4) ])
     return corners
 
-def get_cell(output,i, size, bin_threshold=150):
+def get_cell(output,i, width, height, bin_threshold=150):
     j, k = i//9, i%9
-    cell = output[size*j:size*(j+1),size*k:size*(k+1)]
+    cell = output[height*j:height*(j+1),width*k:width*(k+1)]
     cell = 255 - (cell - np.min(cell))/(np.max(cell) - np.min(cell)) * 255
     ret, cell = cv2.threshold(cell, bin_threshold, 255, cv2.THRESH_BINARY)
 #     cell = cv2.adaptiveThreshold(cell.astype(np.uint8),255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
@@ -24,9 +24,9 @@ def get_cell(output,i, size, bin_threshold=150):
     cell = cv2.morphologyEx(cell, cv2.MORPH_DILATE, (3,3), 1)
     return cell
 
-def capture_image(path, scale=0.3, size=28, bin_threshold=150):
-    width = size*9
-    height = size*9
+def capture_image(path, scale=0.3, width=28, height=28, bin_threshold=150):
+    board_width = width*9
+    board_height = height*9
 
     image = cv2.imread(path,0)
     image_resized = cv2.resize(image, None, fx=scale, fy=scale)
@@ -68,11 +68,11 @@ def capture_image(path, scale=0.3, size=28, bin_threshold=150):
     ## 変更前の4点
     src = np.float32(corners)
     ## 変換後の4点
-    dst = np.float32([[0, 0],[0, height],[width, 0],[width, height]])
+    dst = np.float32([[0,0],[0,board_width],[board_height,0],[board_height,board_width]])
     ## 変換行列
     M = cv2.getPerspectiveTransform(src[:,::-1], dst[:,::-1])
     ## 射影変換・透視変換する
-    output = cv2.warpPerspective(image_resized,M,(width, height))
+    output = cv2.warpPerspective(image_resized,M,(board_width, board_height))
 
-    cells = np.array([ get_cell(output,i,size,bin_threshold=bin_threshold) for i in range(81) ])
+    cells = np.array([ get_cell(output,i,width,height,bin_threshold=bin_threshold) for i in range(81) ])
     return cells
